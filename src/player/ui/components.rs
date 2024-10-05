@@ -105,8 +105,9 @@ pub fn action(player: &Arc<Player>, width: usize) -> String {
 /// Creates the bottom controls bar, and also spaces it properly.
 pub fn controls(width: usize) -> String {
     let controls = [["[s]", "kip"], ["[p]", "ause"], ["[q]", "uit"]];
-    let len: usize = controls.concat().iter().map(|x| x.len()).sum();
+    let offset = if (width) % 2 == 0 {1} else {0};
+    let len: usize = controls.concat().iter().map(|x| x.len()).sum() + offset;
     let controls = controls.map(|x| format!("{}{}", x[0].bold(), x[1]));
-
     controls.join(&" ".repeat((width - len) / (controls.len() - 1)))
 }
+

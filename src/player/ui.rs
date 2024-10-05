@@ -19,7 +19,10 @@ use crossterm::{
         PushKeyboardEnhancementFlags,
     },
     style::{Print, Stylize},
-    terminal::{self, Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{
+        self, Clear, ClearType, EnterAlternateScreen,
+        LeaveAlternateScreen, size,
+    },
 };
 use lazy_static::lazy_static;
 use tokio::{
@@ -32,8 +35,8 @@ use super::Messages;
 
 mod components;
 
-/// The total width of the UI.
-const WIDTH: usize = 27;
+/// Fallback terminal width if none can be detected.
+const DEFAULT_WIDTH: usize = 27;
 
 /// Self explanitory.
 const FPS: usize = 12;
@@ -59,15 +62,20 @@ lazy_static! {
 /// has been displayed for, so that it's only displayed for a certain amount of frames.
 async fn interface(player: Arc<Player>) -> eyre::Result<()> {
     loop {
-        let action = components::action(&player, WIDTH);
+        // Dynamically detect terminal width, or use fallback.
+        let width = match size() {
+          Ok(s) => (s.0 - 4u16) as usize,
+          Err(_e) => DEFAULT_WIDTH,
+        };
+        let action = components::action(&player, width);
 
         let timer = VOLUME_TIMER.load(Ordering::Relaxed);
         let volume = player.sink.volume();
         let percentage = format!("{}%", (volume * 100.0).round().abs());
 
         let middle = match timer {
-            0 => components::progress_bar(&player, WIDTH - 16),
-            _ => components::audio_bar(volume, &percentage, WIDTH - 17),
+            0 => components::progress_bar(&player, width - 16),
+            _ => components::audio_bar(volume, &percentage, width - 17),
         };
 
         if timer > 0 && timer <= AUDIO_BAR_DURATION {
@@ -76,7 +84,7 @@ async fn interface(player: Arc<Player>) -> eyre::Result<()> {
             VOLUME_TIMER.store(0, Ordering::Relaxed);
         }
 
-        let controls = components::controls(WIDTH);
+        let controls = components::controls(width);
 
         // Formats the menu properly
         let menu = [action, middle, controls].map(|x| format!("│ {} │\r\n", x.reset()).to_string());
@@ -85,9 +93,9 @@ async fn interface(player: Arc<Player>) -> eyre::Result<()> {
             stdout(),
             Clear(ClearType::FromCursorDown),
             MoveToColumn(0),
-            Print(format!("┌{}┐\r\n", "─".repeat(WIDTH + 2))),
+            Print(format!("┌{}┐\r\n", "─".repeat(width + 2))),
             Print(menu.join("")),
-            Print(format!("└{}┘", "─".repeat(WIDTH + 2))),
+            Print(format!("└{}┘", "─".repeat(width + 2))),
             MoveToColumn(0),
             MoveUp(4)
         )?;
