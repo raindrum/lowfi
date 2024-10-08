@@ -32,8 +32,10 @@ use super::{Messages, Player};
 
 mod components;
 
-/// Fallback terminal width if none can be detected.
-const DEFAULT_WIDTH: usize = 27;
+/// The app will scale to the width of the terminal, up to the max. If width
+/// deteection fails, use the fallback.
+const MAX_WIDTH: usize = 73;
+const FALLBACK_WIDTH: usize = 27;
 
 /// Self explanitory.
 const FPS: usize = 12;
@@ -117,10 +119,12 @@ async fn input(sender: Sender<Messages>) -> eyre::Result<()> {
 /// has been displayed for, so that it's only displayed for a certain amount of frames.
 async fn interface(player: Arc<Player>, minimalist: bool) -> eyre::Result<()> {
     loop {
-        // Dynamically detect terminal width, or use fallback.
-        let width = match size() {
-          Ok(s) => (s.0 - 4u16) as usize,
-          Err(_e) => DEFAULT_WIDTH,
+        // Recalculate width each loop in case terminal size changed.
+        // Set width to current terminal width, subject to maximum, or fallback
+        // to default.
+        let width: usize = match size() {
+          Ok(s) => (s.0 - 4u16).clamp(0, MAX_WIDTH.try_into().unwrap()) as usize,
+          Err(_e) => FALLBACK_WIDTH,
         };
         let action = components::action(&player, width);
 
